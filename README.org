@@ -1,0 +1,23 @@
+- [ ] edit
+- [ ] delete
+- [ ] forward
+- [ ] thread and reply
+- [ ] user status
+- [ ] files/search/file type
+- [ ] message to self
+- [ ] user/profile info
+- [ ] reminder
+- [ ] user pinned message
+- [ ] invite link
+- [ ] guest
+- [ ] voice/video call
+- [ ] notification preference
+- [ ] download bot
+- [ ] channels
+  + [ ] channel pinned message
+  + [ ] mute/unmute channels (- notification preference)
+  + [ ] private/public channels
+  + [ ] default channels
+  + [ ] channel posting permission
+  + [ ] channel topic
+  + [ ] channel description

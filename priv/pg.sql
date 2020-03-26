@@ -38,7 +38,6 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
-
 CREATE TABLE last (
     username varchar(250) PRIMARY KEY,
     seconds integer NOT NULL,
@@ -46,7 +45,6 @@ CREATE TABLE last (
 );
 
 CREATE INDEX i_last_seconds ON last USING btree (seconds);
-
 
 CREATE TABLE rosterusers (
     username varchar(250) NOT NULL,
@@ -65,7 +63,6 @@ CREATE UNIQUE INDEX i_rosteru_user_jid ON rosterusers USING btree (username, jid
 CREATE INDEX i_rosteru_username ON rosterusers USING btree (username);
 CREATE INDEX i_rosteru_jid ON rosterusers USING btree (jid);
 
-
 CREATE TABLE rostergroups (
     username varchar(250) NOT NULL,
     jid text NOT NULL,
@@ -73,7 +70,6 @@ CREATE TABLE rostergroups (
 );
 
 CREATE INDEX pk_rosterg_user_jid ON rostergroups USING btree (username, jid);
-
 
 CREATE TABLE vcard (
     username varchar(150),
@@ -161,7 +157,6 @@ CREATE TABLE private_storage (
 CREATE INDEX i_private_storage_username ON private_storage USING btree (username);
 CREATE UNIQUE INDEX i_private_storage_username_namespace ON private_storage USING btree (username, namespace);
 
-
 CREATE TABLE roster_version (
     username varchar(250) PRIMARY KEY,
     version text NOT NULL
@@ -204,13 +199,21 @@ CREATE TABLE mam_message(
   direction mam_direction NOT NULL,
   -- Term-encoded message packet
   message bytea NOT NULL,
+  msg_type smallint NOT NULL,
+  refers_to BIGINT,
   search_body text,
+  indexed_search_body tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(search_body, ''))) STORED,
   PRIMARY KEY(user_id, id)
 );
+
 CREATE INDEX i_mam_message_username_jid_id
     ON mam_message
     USING BTREE
     (user_id, remote_bare_jid, id);
+
+CREATE INDEX i_mam_message_search_body_idx
+    ON mam_message
+    USING GIN (indexed_search_body);
 
 CREATE TABLE mam_config(
   user_id INT NOT NULL,
@@ -228,6 +231,7 @@ CREATE TABLE mam_server_user(
   server    varchar(250) NOT NULL,
   user_name varchar(250) NOT NULL
 );
+
 CREATE UNIQUE INDEX i_mam_server_user_name
     ON mam_server_user
     USING BTREE
@@ -244,26 +248,15 @@ CREATE TABLE mam_muc_message(
   nick_name varchar(250) NOT NULL,
   -- Term-encoded message packet
   message bytea NOT NULL,
+  msg_type smallint NOT NULL,
   search_body text,
+  indexed_search_body tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(search_body, ''))) STORED,
   PRIMARY KEY (room_id, id)
 );
-
 CREATE INDEX i_mam_muc_message_sender_id ON mam_muc_message USING BTREE (sender_id);
-
-CREATE TABLE offline_message(
-    id SERIAL UNIQUE PRIMARY Key,
-    timestamp BIGINT NOT NULL,
-    expire    BIGINT,
-    server    varchar(250)    NOT NULL,
-    username  varchar(250)    NOT NULL,
-    from_jid  varchar(250)    NOT NULL,
-    packet    text            NOT NULL,
-    permanent_fields bytea
-);
-CREATE INDEX i_offline_message
-    ON offline_message
-    USING BTREE
-    (server, username, id);
+CREATE INDEX i_mam_muc_message_search_body_idx
+    ON mam_muc_message
+    USING GIN (indexed_search_body);
 
 CREATE TABLE auth_token(
     owner   TEXT    NOT NULL PRIMARY KEY,
@@ -339,7 +332,8 @@ CREATE TABLE inbox (
     unread_count int                 NOT NULL,
     msg_id varchar(250),
     timestamp BIGINT                 NOT NULL,
-    PRIMARY KEY(luser, lserver, remote_bare_jid));
+    PRIMARY KEY(luser, lserver, remote_bare_jid)
+);
 
 CREATE INDEX i_inbox
     ON inbox
@@ -431,3 +425,17 @@ CREATE TABLE mongoose_cluster_id (
     k varchar(50) PRIMARY KEY,
     v text
 );
+
+-- CREATE OR REPLACE FUNCTION tsvector_seach_body_tigger() RETURNS trigger AS $$
+-- BEGIN
+--     new.indexed_search_body :=
+--     to_tsvector(new.search_body);
+--     return new;
+-- END
+-- $$ LANGUAGE PLPGSQL;
+
+-- CREATE TRIGGER search_body_tsvectorupdate_mam_message BEFORE INSERT OR UPDATE
+--    ON mam_message FOR EACH ROW EXECUTE PROCEDURE tsvector_seach_body_tigger();
+
+-- CREATE TRIGGER search_body_tsvectorupdate_muc_mam_message BEFORE INSERT OR UPDATE
+--    ON mam_muc_message FOR EACH ROW EXECUTE PROCEDURE tsvector_seach_body_tigger()
